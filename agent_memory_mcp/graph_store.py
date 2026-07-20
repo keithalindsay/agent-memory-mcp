@@ -123,22 +123,23 @@ class GraphStore:
             n = self.get_node(nid)
             return n.name if n else nid
 
-        def walk(current: str, steps: list[str], visited: set[str], depth: int) -> None:
-            outs = self.neighbors(current, rel=relation, direction="out")
-            if not outs:
+        def walk(current: str, steps: list[str], visited: set[str]) -> None:
+            # len(steps) == number of hops already taken from `start`.
+            if len(steps) >= hops:
                 if steps:
                     results.append(Path(steps=list(steps)))
                 return
-            for rel, other in outs:
-                if other in visited or depth >= hops:
-                    if steps:
-                        step = f"{name_of(current)} --{rel}--> {name_of(other)}"
-                        results.append(Path(steps=steps + [step]))
-                    continue
+            outs = self.neighbors(current, rel=relation, direction="out")
+            unvisited = [(rel, other) for rel, other in outs if other not in visited]
+            if not unvisited:
+                if steps:
+                    results.append(Path(steps=list(steps)))
+                return
+            for rel, other in unvisited:
                 step = f"{name_of(current)} --{rel}--> {name_of(other)}"
-                walk(other, steps + [step], visited | {other}, depth + 1)
+                walk(other, steps + [step], visited | {other})
 
-        walk(start, [], {start}, 0)
+        walk(start, [], {start})
         return results
 
     def remove_entity(self, node_id: str) -> int:
