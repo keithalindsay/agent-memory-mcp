@@ -6,7 +6,7 @@ import json
 import sqlite3
 from typing import Optional
 
-from .models import Entity, Path
+from .models import Entity, PathTrace
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS nodes (
@@ -121,13 +121,13 @@ class GraphStore:
         rows = self._conn.execute(sql, params).fetchall()
         return [(r["rel"], r["other"]) for r in rows]
 
-    def traverse(self, start: str, relation: str, hops: int = 2) -> list[Path]:
+    def traverse(self, start: str, relation: str, hops: int = 2) -> list[PathTrace]:
         """Follow ``relation`` outward from ``start`` up to ``hops`` steps.
 
         Returns one Path per reachable terminal node, with human-readable steps
         like ``"Dana --MANAGED_BY--> Evan"``. Cycles are guarded against.
         """
-        results: list[Path] = []
+        results: list[PathTrace] = []
 
         def name_of(nid: str) -> str:
             n = self.get_node(nid)
@@ -137,13 +137,13 @@ class GraphStore:
             # len(steps) == number of hops already taken from `start`.
             if len(steps) >= hops:
                 if steps:
-                    results.append(Path(steps=list(steps)))
+                    results.append(PathTrace(steps=list(steps)))
                 return
             outs = self.neighbors(current, rel=relation, direction="out")
             unvisited = [(rel, other) for rel, other in outs if other not in visited]
             if not unvisited:
                 if steps:
-                    results.append(Path(steps=list(steps)))
+                    results.append(PathTrace(steps=list(steps)))
                 return
             for rel, other in unvisited:
                 step = f"{name_of(current)} --{rel}--> {name_of(other)}"

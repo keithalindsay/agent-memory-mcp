@@ -42,7 +42,7 @@ class Hit(BaseModel):
     score: float
 
 
-class Path(BaseModel):
+class PathTrace(BaseModel):
     steps: list[str] = Field(default_factory=list)  # ["Dana --MANAGED_BY--> Evan", ...]
 
 
