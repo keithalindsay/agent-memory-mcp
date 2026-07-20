@@ -1,0 +1,21 @@
+[
+  { "id": "q1", "text": "What is Dana's role?", "category": "single_hop", "gold_answer": "Engineer" },
+  { "id": "q2", "text": "Who is Dana's manager?", "category": "single_hop", "gold_answer": "Evan" },
+  { "id": "q3", "text": "What is Priya's role?", "category": "single_hop", "gold_answer": "Designer" },
+  { "id": "q4", "text": "Which team owns the Auth Service?", "category": "single_hop", "gold_answer": "Platform Team" },
+  { "id": "q5", "text": "Who is Hiro's manager?", "category": "single_hop", "gold_answer": "Evan" },
+  { "id": "q17", "text": "Who is managed by Owen?", "category": "single_hop", "gold_answer": "Farah" },
+
+  { "id": "q6", "text": "Who does Dana's manager report to?", "category": "multi_hop", "gold_answer": "Farah" },
+  { "id": "q7", "text": "Who does Hiro's manager report to?", "category": "multi_hop", "gold_answer": "Farah" },
+  { "id": "q8", "text": "Who does Priya's manager report to?", "category": "multi_hop", "gold_answer": "Farah" },
+  { "id": "q9", "text": "Who does Evan's manager report to?", "category": "multi_hop", "gold_answer": "Owen" },
+  { "id": "q10", "text": "Who is the manager of Dana's manager?", "category": "multi_hop", "gold_answer": "Farah" },
+  { "id": "q11", "text": "Who does Grace's manager report to?", "category": "multi_hop", "gold_answer": "Owen" },
+
+  { "id": "q12", "text": "Which project uses a service owned by the Search Team?", "category": "aggregation", "gold_answer": "Atlas" },
+  { "id": "q13", "text": "Which project uses a service owned by the Platform Team?", "category": "aggregation", "gold_answer": "Beacon" },
+  { "id": "q14", "text": "Which team owns the service used by Beacon?", "category": "aggregation", "gold_answer": "Platform Team" },
+  { "id": "q15", "text": "Which team owns a service used by Atlas?", "category": "aggregation", "gold_answer": "Search Team" },
+  { "id": "q16", "text": "Which project depends on a service that the Platform Team maintains?", "category": "aggregation", "gold_answer": "Beacon" }
+]

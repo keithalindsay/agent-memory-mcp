@@ -64,14 +64,17 @@ def infer_relations(query: str, mask_spans: Optional[list[tuple[int, int]]] = No
     return [rel for _pos, rel in hits]
 
 
+_TYPE_PHRASES = [
+    ("project", "Project"),
+    ("service", "Service"),
+    ("team", "Team"),
+    ("database", "Service"),
+]
+
+
 def expected_answer_type(query: str) -> Optional[str]:
     low = query.lower()
-    for kw, typ in [
-        ("project", "Project"),
-        ("service", "Service"),
-        ("team", "Team"),
-        ("database", "Service"),
-    ]:
+    for kw, typ in _TYPE_PHRASES:
         if f"which {kw}" in low or f"what {kw}" in low:
             return typ
     if re.search(r"\bwho\b|\bwhom\b", low):
@@ -79,12 +82,25 @@ def expected_answer_type(query: str) -> Optional[str]:
     return None
 
 
+def _type_phrase_spans(query: str) -> list[tuple[int, int]]:
+    """Spans of 'which <type>' / 'what <type>' so the type noun does not fire a relation."""
+    low = query.lower()
+    spans: list[tuple[int, int]] = []
+    for kw, _typ in _TYPE_PHRASES:
+        for lead in ("which", "what"):
+            phrase = f"{lead} {kw}"
+            idx = low.find(phrase)
+            if idx != -1:
+                spans.append((idx, idx + len(phrase)))
+    return spans
+
+
 def graph_answer(query: str, graph: GraphStore) -> Optional[RecallResult]:
     """Traverse the graph to answer the query; returns a RecallResult or None."""
     resolved = resolve_entities(query, graph)
     if not resolved:
         return None
-    spans = [span for _e, span in resolved]
+    spans = [span for _e, span in resolved] + _type_phrase_spans(query)
     rels = infer_relations(query, mask_spans=spans)
     if not rels:
         return None

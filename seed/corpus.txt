@@ -1,0 +1,19 @@
+# Synthetic, fictional org knowledge for the graph-vs-vector benchmark.
+# One natural-language statement per line. Ingested through the real remember() pipeline.
+Dana is an Engineer.
+Priya is a Designer.
+Dana is managed by Evan.
+Hiro is managed by Evan.
+Evan is managed by Farah.
+Grace is managed by Farah.
+Farah is managed by Owen.
+Priya is managed by Grace.
+Dana is a member of the Search Team.
+Hiro is a member of the Search Team.
+Grace is a member of the Platform Team.
+The Search Team owns the Index Service.
+The Search Team owns the Query Service.
+The Platform Team owns the Auth Service.
+Atlas uses the Index Service.
+Atlas uses the Query Service.
+Beacon uses the Auth Service.
