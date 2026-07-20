@@ -56,6 +56,12 @@ class GraphStore:
         )
         self._conn.commit()
 
+    def has_edge(self, src: str, rel: str, dst: str) -> bool:
+        row = self._conn.execute(
+            "SELECT 1 FROM edges WHERE src=? AND rel=? AND dst=?", (src, rel, dst)
+        ).fetchone()
+        return row is not None
+
     # --- reads ---
     def get_node(self, node_id: str) -> Optional[Entity]:
         row = self._conn.execute(
@@ -63,7 +69,9 @@ class GraphStore:
         ).fetchone()
         if row is None:
             return None
-        return Entity(id=row["id"], type=row["type"], name=row["name"], attrs=json.loads(row["attrs"]))
+        return Entity(
+            id=row["id"], type=row["type"], name=row["name"], attrs=json.loads(row["attrs"])
+        )
 
     def find_nodes(self, name: str) -> list[Entity]:
         """Case-insensitive match: exact-name first, then substring, longest first."""
@@ -91,7 +99,9 @@ class GraphStore:
         for r in rows:
             if f and f not in r["name"].lower():
                 continue
-            out.append(Entity(id=r["id"], type=r["type"], name=r["name"], attrs=json.loads(r["attrs"])))
+            out.append(
+                Entity(id=r["id"], type=r["type"], name=r["name"], attrs=json.loads(r["attrs"]))
+            )
         return out
 
     def neighbors(
@@ -144,9 +154,7 @@ class GraphStore:
 
     def remove_entity(self, node_id: str) -> int:
         """Delete a node and every edge touching it. Returns edges removed."""
-        cur = self._conn.execute(
-            "DELETE FROM edges WHERE src = ? OR dst = ?", (node_id, node_id)
-        )
+        cur = self._conn.execute("DELETE FROM edges WHERE src = ? OR dst = ?", (node_id, node_id))
         edges_removed = cur.rowcount
         self._conn.execute("DELETE FROM nodes WHERE id = ?", (node_id,))
         self._conn.commit()
@@ -160,7 +168,5 @@ class GraphStore:
         return int(self._conn.execute("SELECT COUNT(*) FROM edges").fetchone()[0])
 
     def relation_counts(self) -> dict[str, int]:
-        rows = self._conn.execute(
-            "SELECT rel, COUNT(*) c FROM edges GROUP BY rel"
-        ).fetchall()
+        rows = self._conn.execute("SELECT rel, COUNT(*) c FROM edges GROUP BY rel").fetchall()
         return {r["rel"]: int(r["c"]) for r in rows}

@@ -14,8 +14,26 @@ from .vocab import EXTRACT_TRIGGERS, infer_type, node_id
 
 # Tokens stripped from the edges of an entity noun phrase.
 _EDGE_STOP = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "its", "his", "her", "their", "our", "my", "this", "that", "these", "those",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "its",
+    "his",
+    "her",
+    "their",
+    "our",
+    "my",
+    "this",
+    "that",
+    "these",
+    "those",
     "of",
 }
 
@@ -25,8 +43,7 @@ _TRIGGERS_SORTED = sorted(EXTRACT_TRIGGERS, key=lambda t: len(t[0]), reverse=Tru
 
 @runtime_checkable
 class Extractor(Protocol):
-    def extract(self, text: str) -> list[Statement]:
-        ...
+    def extract(self, text: str) -> list[Statement]: ...
 
 
 def _split_sentences(text: str) -> list[str]:
@@ -99,7 +116,9 @@ class RulesExtractor:
                 # carried subject from a preceding "which/who/that"
                 if carried is None and idx > 0:
                     carried = None
-                subject_override = carried if carried else prev_object_name if _looks_headless(clause) else None
+                subject_override = (
+                    carried if carried else prev_object_name if _looks_headless(clause) else None
+                )
 
                 parsed = self._parse_clause(clause, subject_override)
                 if parsed is None:
@@ -119,9 +138,7 @@ class RulesExtractor:
                     seen.add(e.id)
                     uniq_entities.append(e)
 
-            statements.append(
-                Statement(text=sentence, entities=uniq_entities, relations=relations)
-            )
+            statements.append(Statement(text=sentence, entities=uniq_entities, relations=relations))
         return statements
 
     def _parse_clause(
@@ -195,8 +212,9 @@ class LlmExtractor:
         import json
 
         self._ensure_client()
-        prompt = _LLM_PROMPT.format(vocab=", ".join(sorted(set(r for _, r, _ in EXTRACT_TRIGGERS))), text=text)
-        last_err: Optional[Exception] = None
+        prompt = _LLM_PROMPT.format(
+            vocab=", ".join(sorted(set(r for _, r, _ in EXTRACT_TRIGGERS))), text=text
+        )
         for _attempt in range(2):  # single bounded retry
             try:
                 resp = self._client.messages.create(
@@ -207,8 +225,7 @@ class LlmExtractor:
                 raw = resp.content[0].text
                 data = json.loads(_extract_json(raw))
                 return self._to_statements(text, data)
-            except Exception as exc:  # noqa: BLE001 - bounded retry then fall back
-                last_err = exc
+            except Exception:  # noqa: BLE001 - bounded retry then fall back
                 continue
         # On repeated failure, degrade gracefully to raw storage (never throw).
         return [Statement(text=s) for s in _split_sentences(text)] or [Statement(text=text)]

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from pathlib import Path as _FsPath
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -84,13 +84,13 @@ class Scorecard(BaseModel):
     results: list[GradedResult] = Field(default_factory=list)
 
 
-def load_questions(path: str | Path) -> list[Question]:
+def load_questions(path: str | _FsPath) -> list[Question]:
     """Load the labeled eval questions from a JSON file (DESIGN.md §8.4)."""
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    data = json.loads(_FsPath(path).read_text(encoding="utf-8"))
     return [Question(**item) for item in data]
 
 
-def read_corpus_lines(path: str | Path) -> list[str]:
+def read_corpus_lines(path: str | _FsPath) -> list[str]:
     """Read the seed corpus: one natural-language statement per non-empty line."""
-    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    lines = _FsPath(path).read_text(encoding="utf-8").splitlines()
     return [ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")]

@@ -6,7 +6,6 @@ from agent_memory_mcp.embedders import HashEmbedder, get_embedder
 from agent_memory_mcp.graph_store import GraphStore
 from agent_memory_mcp.vector_store import VectorStore
 
-
 # --- Embedder ---------------------------------------------------------------
 
 
@@ -60,7 +59,14 @@ def test_vector_store_roundtrip_and_nearest_hit():
 def test_vector_store_delete_by_entity():
     e = HashEmbedder(dim=256)
     vs = VectorStore(":memory:", dim=256)
-    vs.add(None, "Dana is managed by Evan.", "person:dana", "MANAGED_BY", "person:evan", e.embed("Dana is managed by Evan."))
+    vs.add(
+        None,
+        "Dana is managed by Evan.",
+        "person:dana",
+        "MANAGED_BY",
+        "person:evan",
+        e.embed("Dana is managed by Evan."),
+    )
     vs.add(None, "Bananas grow in tropical climates.", None, None, None, e.embed("bananas"))
     removed = vs.delete_by_entity("person:dana")
     assert removed == 1

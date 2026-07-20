@@ -4,6 +4,8 @@ The same facts are stored both as vector RAG and as a knowledge graph, so you ca
 measure — live, on your own data — exactly where the graph beats vectors.
 """
 
+from .memory import Memory
+
 __version__ = "0.1.0"
 
-__all__ = ["__version__"]
+__all__ = ["Memory", "__version__"]

@@ -32,7 +32,9 @@ def fact_id_for(text: str) -> str:
 class VectorStore:
     """Facts + float32 vectors in SQLite; cosine top-k via numpy."""
 
-    def __init__(self, db_path: str, dim: int = 256, conn: Optional[sqlite3.Connection] = None) -> None:
+    def __init__(
+        self, db_path: str, dim: int = 256, conn: Optional[sqlite3.Connection] = None
+    ) -> None:
         self.dim = dim
         self._conn = conn or sqlite3.connect(db_path)
         self._conn.row_factory = sqlite3.Row
@@ -81,11 +83,18 @@ class VectorStore:
             for i in order
         ]
 
-    def delete_by_entity(self, name: str) -> int:
-        """Delete facts whose src or dst equals the entity id. Returns count removed."""
-        cur = self._conn.execute(
-            "DELETE FROM facts WHERE src = ? OR dst = ?", (name, name)
-        )
+    def delete_by_entity(self, entity_id: str, name: Optional[str] = None) -> int:
+        """Delete facts whose src/dst equals the entity id, or (optionally) whose
+        raw text mentions ``name``. Returns count removed."""
+        if name:
+            cur = self._conn.execute(
+                "DELETE FROM facts WHERE src = ? OR dst = ? OR text LIKE ?",
+                (entity_id, entity_id, f"%{name}%"),
+            )
+        else:
+            cur = self._conn.execute(
+                "DELETE FROM facts WHERE src = ? OR dst = ?", (entity_id, entity_id)
+            )
         self._conn.commit()
         return cur.rowcount
 
