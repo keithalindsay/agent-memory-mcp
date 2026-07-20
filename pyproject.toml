@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-memory-mcp"
+version = "0.1.0"
+description = "A benchmarking MCP server for agent memory — the same facts stored as both vector RAG and a knowledge graph, so you can measure, live, exactly where the graph beats vectors."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Keith Lindsay" }]
+keywords = ["mcp", "agent", "memory", "knowledge-graph", "rag", "vector-search", "benchmark"]
+dependencies = [
+    "mcp>=1.0",
+    "typer>=0.9",
+    "rich>=13.0",
+    "numpy>=1.24",
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+st = ["sentence-transformers>=2.2"]
+llm = ["anthropic>=0.40"]
+dev = ["pytest>=7.0", "ruff>=0.1", "black>=23.0"]
+
+[project.scripts]
+agent-memory-mcp = "agent_memory_mcp.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["agent_memory_mcp*"]
+
+[tool.setuptools.package-data]
+agent_memory_mcp = ["../seed/*.txt", "../seed/*.json"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

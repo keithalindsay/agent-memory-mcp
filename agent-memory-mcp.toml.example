@@ -1,0 +1,15 @@
+# Copy to `agent-memory-mcp.toml` in your working directory to override built-in defaults.
+# CLI flags override this file; this file overrides built-in defaults; env vars are read
+# where noted below.
+
+[defaults]
+db = "~/.agent-memory-mcp/memory.sqlite"
+extractor = "rules"     # rules | llm
+embedder  = "hash"      # hash | st
+dim = 256
+k = 4
+
+[llm]
+# Env var holding the Anthropic model id. Default model id: claude-haiku-4-5.
+# The model string is never hardcoded outside config.py.
+model_env = "AGENT_MEMORY_MODEL"
