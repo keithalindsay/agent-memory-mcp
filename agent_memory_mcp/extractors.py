@@ -222,7 +222,7 @@ class LlmExtractor:
                     max_tokens=1024,
                     messages=[{"role": "user", "content": prompt}],
                 )
-                raw = resp.content[0].text
+                raw = _first_text_block(resp)
                 data = json.loads(_extract_json(raw))
                 return self._to_statements(text, data)
             except Exception:  # noqa: BLE001 - bounded retry then fall back
@@ -260,6 +260,18 @@ If nothing can be structured, return {{"relations": []}}.
 TEXT:
 {text}
 """
+
+
+def _first_text_block(resp) -> str:
+    """Return the first text block's text from an Anthropic Messages response."""
+    for block in getattr(resp, "content", []) or []:
+        if getattr(block, "type", "text") == "text" and getattr(block, "text", None):
+            return block.text
+    # fall back to the first block's text attribute
+    content = getattr(resp, "content", None)
+    if content:
+        return getattr(content[0], "text", "") or ""
+    return ""
 
 
 def _extract_json(raw: str) -> str:
