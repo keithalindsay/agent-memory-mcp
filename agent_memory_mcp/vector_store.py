@@ -84,19 +84,35 @@ class VectorStore:
         ]
 
     def delete_by_entity(self, entity_id: str, name: Optional[str] = None) -> int:
-        """Delete facts whose src/dst equals the entity id, or (optionally) whose
-        raw text mentions ``name``. Returns count removed."""
-        if name:
-            cur = self._conn.execute(
-                "DELETE FROM facts WHERE src = ? OR dst = ? OR text LIKE ?",
-                (entity_id, entity_id, f"%{name}%"),
-            )
-        else:
-            cur = self._conn.execute(
-                "DELETE FROM facts WHERE src = ? OR dst = ?", (entity_id, entity_id)
-            )
+        """Delete facts belonging to an entity. Returns count removed.
+
+        Templated facts carry the entity id in ``src``/``dst`` and are removed by
+        exact id match. Raw statements (src/dst NULL) reference the entity only by
+        its display ``name``; those are removed only when the name appears as a
+        WHOLE WORD, so forgetting "Ana" never touches a fact about "Diana", and a
+        name that happens to contain a SQL wildcard ("%", "_") can never match
+        every row and wipe the store.
+        """
+        cur = self._conn.execute(
+            "DELETE FROM facts WHERE src = ? OR dst = ?", (entity_id, entity_id)
+        )
+        removed = cur.rowcount
+        if name and name.strip():
+            removed += self._delete_raw_by_name(name.strip())
         self._conn.commit()
-        return cur.rowcount
+        return removed
+
+    def _delete_raw_by_name(self, name: str) -> int:
+        """Delete facts whose text mentions ``name`` as a whole word (case-insensitive)."""
+        # Whole-word match around the (regex-escaped) literal name. Boundaries use
+        # lookarounds on word characters rather than \b so names beginning/ending
+        # with punctuation (e.g. "%") still match cleanly and safely.
+        pattern = re.compile(rf"(?<!\w){re.escape(name)}(?!\w)", re.IGNORECASE)
+        rows = self._conn.execute("SELECT fact_id, text FROM facts").fetchall()
+        doomed = [r["fact_id"] for r in rows if pattern.search(r["text"])]
+        for fid in doomed:
+            self._conn.execute("DELETE FROM facts WHERE fact_id = ?", (fid,))
+        return len(doomed)
 
     def count(self) -> int:
         return int(self._conn.execute("SELECT COUNT(*) FROM facts").fetchone()[0])

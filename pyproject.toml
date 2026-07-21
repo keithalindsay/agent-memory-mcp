@@ -27,8 +27,8 @@ dev = ["pytest>=7.0", "ruff>=0.1", "black>=23.0"]
 [project.scripts]
 agent-memory-mcp = "agent_memory_mcp.cli:app"
 
-[tool.setuptools.packages.find]
-include = ["agent_memory_mcp*"]
+[tool.setuptools]
+packages = ["agent_memory_mcp"]
 
 [tool.setuptools.package-data]
 agent_memory_mcp = ["../seed/*.txt", "../seed/*.json"]

@@ -6,7 +6,9 @@ the query relation-inference map new relations.
 
 from __future__ import annotations
 
+import hashlib
 import re
+import unicodedata
 
 # --- Relation trigger phrases for EXTRACTION -------------------------------
 # Each entry: (surface phrase, relation, flip) where flip=True means
@@ -125,9 +127,21 @@ TYPE_KEYWORDS: list[tuple[str, str]] = [
 
 
 def slug(name: str) -> str:
-    """Lowercase + hyphenate a display name into an id slug."""
-    s = re.sub(r"[^a-z0-9]+", "-", name.strip().lower())
-    return s.strip("-")
+    """Lowercase + hyphenate a display name into an id slug.
+
+    ASCII names keep their familiar ``hello-world`` form. When a name has no
+    [a-z0-9] characters at all (e.g. an all-CJK/Cyrillic/Arabic/emoji name),
+    stripping would yield an empty slug and every such entity would collide on
+    one node id. To keep distinct entities distinct we fall back to a short,
+    deterministic hash of the Unicode-normalized original name.
+    """
+    normalized = unicodedata.normalize("NFC", name.strip())
+    s = re.sub(r"[^a-z0-9]+", "-", normalized.lower()).strip("-")
+    if s:
+        return s
+    if not normalized:
+        return ""
+    return "u-" + hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:12]
 
 
 def node_id(type_: str, name: str) -> str:
