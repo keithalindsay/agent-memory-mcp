@@ -1,8 +1,8 @@
 # agent-memory-mcp
 
 > **A benchmarking MCP server for agent memory** — the same facts stored as both
-> vector RAG and a knowledge graph, so you can measure, live, exactly where the
-> graph beats vectors.
+> vector retrieval and a knowledge graph, behind identical tools, so you can measure
+> where each one actually works instead of assuming.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
@@ -10,25 +10,41 @@
 
 ## The experiment
 
-"Knowledge graphs are the memory layer for agents" is an oft-repeated claim that
-teams rarely get to *test* against their own agent's real usage. `agent-memory-mcp`
-turns it into a running experiment: it exposes two memory backends — plain **vector
-RAG** and a **knowledge graph** — behind the *same* Model Context Protocol tools, so
-the identical question can be answered by vector similarity or by graph traversal and
-the two compared head-to-head. **Memory you can benchmark, not just trust.**
+"Knowledge graphs are the memory layer for agents" is an oft-repeated claim that teams
+rarely get to *test* against their own agent's real usage. `agent-memory-mcp` turns it
+into a running experiment: it exposes two memory backends — **vector retrieval** and a
+**knowledge graph** — behind the *same* Model Context Protocol tools, so the identical
+question can be answered either way and the two compared side by side.
+**Memory you can measure, not just trust.**
 
-Vector search works when the answer sits in one chunk. It fails whenever the answer
-must be *assembled by following relationships* — *"Who does Dana's manager report
-to?"*, *"Which project uses a service owned by the Search Team?"* Those answers live
-in no single chunk; a graph answers them by traversal. This tool lets you see exactly
-where that happens, on your own data.
+Single-shot vector retrieval works when the answer sits in one chunk. It struggles
+whenever the answer must be *assembled by following relationships* — *"Who does Dana's
+manager report to?"*, *"Which project uses a service owned by the Search Team?"* Those
+answers live in no single chunk; a graph reaches them by traversal. This tool lets you
+see where that happens, on your own data.
 
-## Screenshot
+## ⚠️ What the benchmark measures — and what it doesn't
 
-The bundled `bench` harness ingests a labeled seed set through the real `remember`
-pipeline and scores graph-only vs vector-only recall by question category:
+**Read this before quoting any number below.** The bundled harness is a *demonstration
+on 17 questions*, not a benchmark, and the two arms are not matched:
 
-![bench scorecard](docs/screenshot-placeholder.png)
+- **The vector arm has no reader.** It returns the raw text of the top-1 retrieved
+  chunk as its "answer" (`recall.py`), and the grader does loose containment. So its
+  score is **retrieval precision@1, not question-answering accuracy.** A real RAG
+  system is retrieval *plus* generation; the generation stage here (`phrase()`) is a
+  documented no-op.
+- **The graph arm gets a full query-planning layer** — entity resolution, relation
+  inference from a keyword table, answer-type filtering. The vector arm gets
+  `embed → top-1 → return the string`. The honest description of this comparison is
+  **"a rule-based query planner over a knowledge graph, versus raw nearest-neighbour
+  lookup"** — not "graph versus RAG."
+- **Duplicate rows shrink the vector arm's budget.** Every statement is stored twice
+  (templated fact + raw text), so 17 corpus lines become **27 rows**. At the default
+  `k=4` the effective distinct-fact budget is about two.
+
+### The numbers, with the caveat attached
+
+Default `hash` embedder, 17 questions:
 
 ```
                 Recall accuracy by category
@@ -38,23 +54,73 @@ pipeline and scores graph-only vs vector-only recall by question category:
 │ vector │       0.83 │      0.00 │        0.20 │    0.35 │
 │ graph  │       1.00 │      1.00 │        1.00 │    1.00 │
 └────────┴────────────┴───────────┴─────────────┴─────────┘
-Wrote results/scorecard.json
 ```
 
-Single-hop lookups are roughly a tie — both backends find a fact that sits in one
-sentence. The graph pulls decisively ahead on **multi-hop** and **aggregation**
-questions, exactly the relationship-following cases vector RAG can't assemble. Run it
-yourself:
+**That 0.35 is not the interesting number.** Score the same retriever on *recall@k* —
+did the gold answer appear anywhere in the top k, which is the ceiling any reader could
+reach — and the gap mostly closes:
+
+| vector arm, same embedder and corpus | single_hop | multi_hop | aggregation | overall |
+|---|---|---|---|---|
+| as shipped (top-1 chunk as the answer) | 0.83 | 0.00 | 0.20 | **0.35** |
+| recall@4 *(the default `k`)* | 1.00 | 0.00 | 0.40 | **0.47** |
+| recall@8 | 1.00 | 0.67 | 0.60 | **0.76** |
+| recall@17 | 1.00 | 1.00 | 0.80 | **0.94** |
+| recall@27 *(the whole store)* | 1.00 | 1.00 | 1.00 | **1.00** |
+
+**So the apparent 0.65-point gap is largely a missing reader and too small a `k`.**
+
+### With real embeddings
+
+The default embedder is a dependency-free **bag-of-hashed-tokens** — SHA-256 each token
+into one of 256 buckets, count, L2-normalize. It has **no semantic capability**:
+"manager" and "managed" are orthogonal. Re-run with `--embedder st`
+(`all-MiniLM-L6-v2`):
+
+| embedder | single_hop | multi_hop | aggregation |
+|---|---|---|---|
+| `hash` | 0.83 | 0.00 | 0.20 |
+| `st` (all-MiniLM-L6-v2) | **1.00** | 0.00 | 0.00 |
+
+A real embedding model takes single-hop to perfect and leaves multi-hop at zero. **That
+is the finding worth keeping:** the multi-hop shortfall is structural to single-shot
+retrieval, not an artifact of a weak embedder — while the headline "overall" gap is
+mostly an artifact of the harness.
+
+Run it yourself:
 
 ```bash
-agent-memory-mcp bench
+agent-memory-mcp bench                 # default hash embedder
+agent-memory-mcp bench --embedder st   # requires: pip install -e ".[st]"
 ```
+
+## Known limitations
+
+Honest inventory, current as of 2026-07-30:
+
+- **Traversal is direction-blind.** Edges are explored in both directions, so
+  `MANAGED_BY` is effectively undirected: *"who is X's manager"* and *"who does X
+  manage"* return the same node. The backend never answers "unknown" — it returns the
+  inverse, and prints a correct-looking path underneath it. **This is a correctness
+  bug, not a tuning issue.**
+- **Hop depth is counted from the question text**, not discovered by search — the
+  number of relation keywords in the query sets the BFS depth.
+- **The rules extractor is a fixed trigger table** (~30 surface phrases over 7
+  relations, in `vocab.py`). Unlisted phrasings silently produce no edge — *"Dianne
+  leads the Discovery Team"* stores raw text and extracts nothing. The tool reports
+  this in its `note`, but graph coverage is bounded by that table. On held-out
+  paraphrases of the seed questions, graph accuracy drops well below the 1.00 above.
+  It also ignores negation and drops conjunctions.
+- **`compare()["agree"]` is almost always `false`** — it compares the graph's entity
+  name against the vector arm's whole sentence, so the two rarely compare equal even
+  when both are right.
+- **`bench --db` is accepted and ignored** — the eval always runs in `:memory:`.
+- **n = 17.** Fictional org-chart data, one domain, one sentence per chunk. This says
+  nothing about chunking, which is where most real retrieval failures live.
 
 ## `compare` in 30 seconds
 
-`compare` is the headline tool: it answers the **same** question with **both**
-backends, side by side. On a multi-hop question the graph traverses to the answer
-while vector similarity stops at the closest single chunk:
+`compare` answers the **same** question with **both** backends, side by side:
 
 ```bash
 agent-memory-mcp remember "Dana is managed by Evan. Evan is managed by Farah."
@@ -67,14 +133,18 @@ agent-memory-mcp compare "Who does Dana's manager report to?"
   "graph":  { "answer": "Farah",
               "support": ["Dana is managed by Evan.", "Evan is managed by Farah."],
               "path": ["Dana --MANAGED_BY--> Evan", "Evan --MANAGED_BY--> Farah"] },
-  "vector": { "answer": "Dana is managed by Evan.", "support": ["Dana is managed by Evan."] },
+  "vector": { "answer": "Dana is managed by Evan.",
+              "support": ["Dana is managed by Evan.", "Evan is managed by Farah."] },
   "agree": false,
   "note": "Graph traversed 2 hops to reach the answer; vector similarity stopped at the single closest chunk."
 }
 ```
 
-The graph reaches **Farah** by following two `MANAGED_BY` edges; vector RAG returns
-the single closest sentence and never assembles the two hops.
+The graph reaches **Farah** by following two `MANAGED_BY` edges and shows the path.
+Note what the vector arm actually did: it **retrieved both hops** into `support` — the
+information was there — and then returned only the top-1 chunk as its answer, because
+there is no reader to assemble them. That is the missing-reader problem above, visible
+in a single call.
 
 ## Add to your MCP client
 
@@ -142,19 +212,20 @@ Every fact is stored **both ways** in one SQLite file:
   nodes and edges. `recall` resolves the entities in your question, infers the
   relation(s), and traverses for an answer **plus the supporting path** — so answers
   are explainable.
-- **Vector store** — `facts` + float32 vectors. The raw statement is *always* embedded
-  too (even when no relation could be extracted), so nothing is ever lost: graph when
-  it can, vector when it can't.
+- **Vector store** — `facts` + float32 vectors, brute-force cosine over L2-normalized
+  embeddings. The raw statement is *always* embedded too (even when no relation could
+  be extracted), so nothing is ever lost: graph when it can, vector when it can't.
 
 `recall(method=...)` pins a single backend (`graph` | `vector`) for head-to-head
-benchmarking, or `auto` (default) tries the graph first and falls back to vectors.
+comparison, or `auto` (default) tries the graph first and falls back to vectors.
 Full design: [DESIGN.md](DESIGN.md).
 
 ## Going further
 
 - **Real embeddings** — install the `st` extra for sentence-transformers and pass
   `--embedder st`: `pip install -e ".[st]"`. Optional; the default hash embedder needs
-  no download.
+  no download. Note: don't mix embedders against one persistent db — the stored vectors
+  are fixed-dimension and the dimensions differ.
 - **LLM extraction** — install the `llm` extra (`pip install -e ".[llm]"`) and run with
   `--extractor llm` to have Anthropic Claude turn messy prose into clean
   entities/relations. Requires `ANTHROPIC_API_KEY`; the model id is read only from
